@@ -11,7 +11,7 @@
 	timeOutHide: null,			//Timer for autohide
 	PersonalToolbar: null,			//Timer for autohide
 
-	register: function() {
+	register: function () {
 		var thisPrefs = Components.classes['@mozilla.org/preferences-service;1'].getService(Components.interfaces.nsIPrefService)
 		this.branch = thisPrefs.getBranch('extensions.roomybookmarkstoolbar.');
 		if (!("addObserver" in this.branch)) {
@@ -20,44 +20,43 @@
 		this.branch.addObserver("", this, false);
 	},
 
-	unregister: function() {
+	unregister: function () {
 		this.branch.removeObserver("", this);
-		window.removeEventListener("beforecustomization", function() {roomybookmarkstoolbar.styleService('file','multirowBar', true);}, false);
-		window.removeEventListener("aftercustomization", function() {roomybookmarkstoolbar.styleService('file','multirowBar');}, false);
+		window.removeEventListener("beforecustomization", function () { roomybookmarkstoolbar.styleService('file', 'multirowBar', true); }, false);
+		window.removeEventListener("aftercustomization", function () { roomybookmarkstoolbar.styleService('file', 'multirowBar'); }, false);
 
 	},
 
-	observe: function(subject, topic, data) {
+	observe: function (subject, topic, data) {
 		if (topic == "nsPref:changed") {
 			roomybookmarkstoolbar.optionsHandler();
-        } else {
+		} else {
 			return;
 		}
 	},
 
-	styleService: function(type, object, unregister) {
+	styleService: function (type, object, unregister) {
 		var styleSheet = Components.classes['@mozilla.org/content/style-sheet-service;1'].getService(Components.interfaces.nsIStyleSheetService);
 		var styleIO = Components.classes['@mozilla.org/network/io-service;1'].getService(Components.interfaces.nsIIOService);
 		var styleURI;
 		if (type == 'file') {
-			styleURI = styleIO.newURI('chrome://roomybookmarkstoolbar/skin/css/'+object+'.css', null, null);
+			styleURI = styleIO.newURI('chrome://roomybookmarkstoolbar/skin/css/' + object + '.css', null, null);
 		}
 		if (type == 'string') {
-			styleURI = styleIO.newURI("data:text/css,"+encodeURIComponent(object), null, null);
+			styleURI = styleIO.newURI("data:text/css," + encodeURIComponent(object), null, null);
 		}
 		if (unregister === true) {
-			if (styleSheet.sheetRegistered(styleURI, styleSheet.USER_SHEET)) {styleSheet.unregisterSheet(styleURI, styleSheet.USER_SHEET);}
+			if (styleSheet.sheetRegistered(styleURI, styleSheet.USER_SHEET)) { styleSheet.unregisterSheet(styleURI, styleSheet.USER_SHEET); }
 		} else {
-			if (!styleSheet.sheetRegistered(styleURI, styleSheet.USER_SHEET)) {styleSheet.loadAndRegisterSheet(styleURI, styleSheet.USER_SHEET);}
+			if (!styleSheet.sheetRegistered(styleURI, styleSheet.USER_SHEET)) { styleSheet.loadAndRegisterSheet(styleURI, styleSheet.USER_SHEET); }
 		}
 	},
 
-	setVisibly: function() {
+	setVisibly: function () {
 		roomybookmarkstoolbar.PersonalToolbar.collapsed = !roomybookmarkstoolbar.visible;
 	},
 
-	hideHandler: function() {
-		var popup = roomybookmarkstoolbar.popup;
+	hideHandler: function () {
 		var visible = roomybookmarkstoolbar.visible;
 		var hovered = roomybookmarkstoolbar.hovered;
 
@@ -66,66 +65,93 @@
 		}
 		this.timeOutHide = null;
 
-		if (!popup && visible && !hovered && !roomybookmarkstoolbar.toolboxOver) {
+		if (!roomybookmarkstoolbar.PersonalToolbar.collapsed && !hovered) {
 			roomybookmarkstoolbar.visible = false;
 			this.timeOutHide = setTimeout(roomybookmarkstoolbar.setVisibly, roomybookmarkstoolbar.hideBarTime);
 		} else {
-			if (roomybookmarkstoolbar.toolboxOver ) {
-				if(!visible && hovered) {
-					roomybookmarkstoolbar.visible = true;
-					roomybookmarkstoolbar.setVisibly();
-				}
-			} else {	//Hide bookmarks bar after fast mouse out(event not catched)
-				this.timeOutHide = setTimeout(roomybookmarkstoolbar.setVisibly, 700);
+			if (hovered) {
+				roomybookmarkstoolbar.visible = true;
+				roomybookmarkstoolbar.setVisibly();
 			}
 		}
 	},
 
-	onMouseOver: function(e) {
+	onMouseOver: function (e) {
+		roomybookmarkstoolbar.lastY = null;
+		var toolbox = document.getElementById("navigator-toolbox");
+
 		if (roomybookmarkstoolbar.autohide) {
+			if (roomybookmarkstoolbar.timeOutHide) {
+				clearTimeout(roomybookmarkstoolbar.timeOutHide);
+			}
+			roomybookmarkstoolbar.timeOutHide = null;
+
 			roomybookmarkstoolbar.hovered = true;
 			roomybookmarkstoolbar.hideHandler();
-
-			roomybookmarkstoolbar.eventListenerhandler(false, true);
 		}
+
+		// try { toolbox.removeEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false); } catch (e) { }
+		roomybookmarkstoolbar.mouseMoveListenerhandler(false);
 	},
 
-	onMouseOutput: function(e) {
+	onMouseOutput: function (e) {
 		if (roomybookmarkstoolbar.autohide) {
-			var toolbox = document.getElementById("navigator-toolbox");
-			if(e.relatedTarget) {
-				var target = e.relatedTarget;
-				while(target) {					//Get all parents of target element
-					if(target == toolbox) {		//Check parent == toobox, if true- mouse out not happaned
-						return;
-					}
-					if (target.class == 'anonymous-div') {
-						return;
-					}
-					target = target.parentNode;	//Get nex parent
-				}
-			}
 			roomybookmarkstoolbar.hovered = false;
-			roomybookmarkstoolbar.toolboxOver = false;
 
-			roomybookmarkstoolbar.hideHandler();
-			
-			roomybookmarkstoolbar.eventListenerhandler(true, true);
+			if (!roomybookmarkstoolbar.toolboxOver) {
+				var toolbox = document.getElementById("navigator-toolbox");
+
+				// toolbox.addEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false);
+				roomybookmarkstoolbar.mouseMoveListenerhandler(true);
+
+				if (e.target == toolbox) roomybookmarkstoolbar.timeOutHide = setTimeout(roomybookmarkstoolbar.hideHandler, 100);
+				// else e.stopPropagation ();
+			}
+			else roomybookmarkstoolbar.hideHandler();
 
 		}
 	},
 
-	onPopupshown: function(e){
+	onMouseMove: function (e) {
+		if (e.target == document.getElementById("PanelUI-button")) return;
+		var toolbox = document.getElementById("navigator-toolbox");
+
+		if (roomybookmarkstoolbar.PersonalToolbar.collapsed || !roomybookmarkstoolbar.autohide) {
+			// try { toolbox.removeEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false); } catch (e) { }
+			roomybookmarkstoolbar.mouseMoveListenerhandler(false);
+			roomybookmarkstoolbar.lastY = null;
+			return;
+		}
+
+		if (roomybookmarkstoolbar.timeOutHide) {
+			clearTimeout(roomybookmarkstoolbar.timeOutHide);
+		}
+		roomybookmarkstoolbar.timeOutHide = null;
+
+		var rect = PersonalToolbar.getBoundingClientRect();
+		var y = Math.abs(e.clientY - rect.top);
+		if (roomybookmarkstoolbar.lastY) {
+			if (y > roomybookmarkstoolbar.lastY) {
+				roomybookmarkstoolbar.lastY = null;
+				roomybookmarkstoolbar.hideHandler();
+				// try { toolbox.removeEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false); } catch (e) { }
+				roomybookmarkstoolbar.mouseMoveListenerhandler(false);
+			}
+		}
+		roomybookmarkstoolbar.lastY = y;
+	},
+
+	onPopupshown: function (e) {
 		roomybookmarkstoolbar.popup = true;
 		roomybookmarkstoolbar.hideHandler();
 	},
 
-	onPopuphidden: function(e){
+	onPopuphidden: function (e) {
 		roomybookmarkstoolbar.popup = false;
 		roomybookmarkstoolbar.hideHandler();
 	},
 
-	onMouseOverFix: function(e) {		//Fix problem with wrong hide, when enabled menu\nav bar\ tabs
+	onMouseOverFix: function (e) {		//Fix problem with wrong hide, when enabled menu\nav bar\ tabs
 		if (this.timeOutHide) {
 			clearTimeout(this.timeOutHide);
 		}
@@ -134,7 +160,19 @@
 		roomybookmarkstoolbar.hideHandler(false, true);
 	},
 
-	eventListenerhandler: function(register, type) {
+	mouseMoveListenerhandler: function (on) {
+		var toolbox = document.getElementById("navigator-toolbox");
+
+		if (on && !roomybookmarkstoolbar.moveListener) {
+			toolbox.addEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false);
+			roomybookmarkstoolbar.moveListener = true;
+		} else if (!on) {
+			toolbox.removeEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false);
+			roomybookmarkstoolbar.moveListener = false;
+		}
+	},
+
+	eventListenerhandler: function (register, type) {
 		var autoHideZoneAll = this.branch.getBoolPref('autoHideZoneAll');
 		var autoHideZoneTab = this.branch.getBoolPref('autoHideZoneTab');
 		var autoHideZoneNav = this.branch.getBoolPref('autoHideZoneNav');
@@ -149,43 +187,63 @@
 		var rbtlibbutton = document.getElementById("rbtlibbutton");
 		var backButton = document.getElementById("back-button");
 		var menuButton = document.getElementById("PanelUI-menu-button");
-		
+		var PersonalToolbar = roomybookmarkstoolbar.PersonalToolbar;
+
 		if (register) {
 			if (type) {
-				if(autoHideZoneAll) {
+				if (autoHideZoneAll) {
 					toolbox.addEventListener("mouseenter", this.onMouseOver, false);
-					toolbox.addEventListener("mouseenter", this.onMouseOverFix, false);
+					// toolbox.addEventListener("mouseenter", this.onMouseOverFix, false);
 				} else {
-					if(autoHideZoneNav) {try { navBar.addEventListener("mouseenter", this.onMouseOver, false);} catch(e) {}}
-					if(autoHideZoneMenu) {try { toolbarmenubar.addEventListener("mouseenter", this.onMouseOver, false);} catch(e) {}}
-					if(autoHideZoneTab) {try { TabsToolbar.addEventListener("mouseenter", this.onMouseOver, false);} catch(e) {}}
-					if(autoHideZoneButton) {try { rbtlibbutton.addEventListener("mouseenter", this.onMouseOver, false);} catch(e) {}}
-					if(autoHideZoneBackButton) {try { backButton.addEventListener("mouseenter", this.onMouseOver, false);} catch(e) {}}
-					if(autoHideZoneMenuButton) {try { menuButton.addEventListener("mouseenter", this.onMouseOver, false);} catch(e) {}}
-					try { toolbox.addEventListener("mouseenter", this.onMouseOverFix, false);} catch(e) {}
+					PersonalToolbar.addEventListener("mouseenter", this.onMouseOver, false);
+					if (autoHideZoneNav) { try { navBar.addEventListener("mouseenter", this.onMouseOver, false); } catch (e) { } }
+					if (autoHideZoneMenu) { try { toolbarmenubar.addEventListener("mouseenter", this.onMouseOver, false); } catch (e) { } }
+					if (autoHideZoneTab) { try { TabsToolbar.addEventListener("mouseenter", this.onMouseOver, false); } catch (e) { } }
+					if (autoHideZoneButton) { try { rbtlibbutton.addEventListener("mouseenter", this.onMouseOver, false); } catch (e) { } }
+					if (autoHideZoneBackButton) { try { backButton.addEventListener("mouseenter", this.onMouseOver, false); } catch (e) { } }
+					if (autoHideZoneMenuButton) { try { menuButton.addEventListener("mouseenter", this.onMouseOver, false); } catch (e) { } }
+					// try { toolbox.addEventListener("mouseenter", this.onMouseOverFix, false);} catch(e) {}
 				}
-		
-				toolbox.addEventListener("popupshown", this.onPopupshown, false);
-				toolbox.addEventListener("popuphidden", this.onPopuphidden, false);
+				// toolbox.addEventListener("popupshown", this.onPopupshown, false);
+				// toolbox.addEventListener("popuphidden", this.onPopuphidden, false);
 			} else {
-				try { toolbox.addEventListener("mouseleave", this.onMouseOutput, false);} catch(e) {}
+				try { toolbox.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { }
+				if (!autoHideZoneAll) {
+					PersonalToolbar.addEventListener("mouseleave", this.onMouseOutput, false);
+					if (autoHideZoneNav) { try { navBar.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { } }
+					if (autoHideZoneMenu) { try { toolbarmenubar.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { } }
+					if (autoHideZoneTab) { try { TabsToolbar.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { } }
+					if (autoHideZoneButton) { try { rbtlibbutton.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { } }
+					if (autoHideZoneBackButton) { try { backButton.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { } }
+					if (autoHideZoneMenuButton) { try { menuButton.addEventListener("mouseleave", this.onMouseOutput, false); } catch (e) { } }
+				} else roomybookmarkstoolbar.toolboxOver = true;
 			}
 		} else {
+			// toolbox.removeEventListener("mousemove", roomybookmarkstoolbar.onMouseMove, false)
+			roomybookmarkstoolbar.mouseMoveListenerhandler(false);
 			if (type) {
-				try { navBar.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}
-				try { toolbarmenubar.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}
-				try { TabsToolbar.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}
-				try { rbtlibbutton.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}
-				try { backButton.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}
-				try { menuButton.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}
-				try { toolbox.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch(e) {}		
+				PersonalToolbar.removeEventListener("mouseenter", this.onMouseOver, false);
+				try { navBar.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
+				try { toolbarmenubar.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
+				try { TabsToolbar.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
+				try { rbtlibbutton.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
+				try { backButton.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
+				try { menuButton.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
+				try { toolbox.removeEventListener("mouseenter", roomybookmarkstoolbar.onMouseOver, false); } catch (e) { }
 			} else {
-				try { toolbox.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false);} catch(e) {}
+				PersonalToolbar.removeEventListener("mouseleave", this.onMouseOutput, false);
+				try { navBar.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
+				try { toolbarmenubar.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
+				try { TabsToolbar.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
+				try { rbtlibbutton.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
+				try { backButton.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
+				try { menuButton.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
+				try { toolbox.removeEventListener("mouseleave", roomybookmarkstoolbar.onMouseOutput, false); } catch (e) { }
 			}
 		}
 	},
 
-	autoHideBookmarksBar: function(change) {
+	autoHideBookmarksBar: function (change) {
 		var bookmarkItem = document.getElementsByClassName("bookmark-item");
 		var autoHideBar = this.branch.getBoolPref('autoHideBar');
 		var BBonNewTab = this.branch.getBoolPref('BBonNewTab');
@@ -194,16 +252,17 @@
 			if (autoHideBar && !BBonNewTab) {
 				roomybookmarkstoolbar.autohide = true;
 				roomybookmarkstoolbar.popup = false;
-				setTimeout(function(){roomybookmarkstoolbar.PersonalToolbar.collapsed = true;}, 1000);
+				setTimeout(function () { roomybookmarkstoolbar.PersonalToolbar.collapsed = true; }, 1000);
 				roomybookmarkstoolbar.visible = false;
 				roomybookmarkstoolbar.toolboxOver = false;
-				roomybookmarkstoolbar.hideBarTime = this.branch.getIntPref('autoHideBarTime')*1000+250;
+				roomybookmarkstoolbar.moveListener = false;
+				roomybookmarkstoolbar.hideBarTime = this.branch.getIntPref('autoHideBarTime') * 1000 + 250;
 
 				this.eventListenerhandler(false, true);
 				this.eventListenerhandler(false, false);
 				this.eventListenerhandler(true, true);
 				this.eventListenerhandler(true, false);
-				
+
 				this.styleService('string', '@namespace url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul); @-moz-document url(chrome://browser/content/browser.xul) {#TabsToolbar {margin-top: 0px !important;}}');
 
 			} else {
@@ -215,28 +274,28 @@
 		}
 	},
 
-	separatorAdded: function(heightSep) {
+	separatorAdded: function (heightSep) {
 		var heightOrig = heightSep;
 		var bookmarkService = Components.classes["@mozilla.org/browser/nav-bookmarks-service;1"].getService(Components.interfaces.nsINavBookmarksService);
 		var bookmarkObserver = {
-				onItemAdded: function(aItemId, aFolder, aIndex) {
-					var tseparator = document.getElementsByTagName("toolbarseparator");
-					for (var i = 0; i < tseparator.length; i++) {
-						tseparator[i].style.height = heightOrig+'px';
-					}
-				},
-				QueryInterface: XPCOMUtils.generateQI([Ci.nsINavBookmarkObserver])
-		   }
+			onItemAdded: function (aItemId, aFolder, aIndex) {
+				var tseparator = document.getElementsByTagName("toolbarseparator");
+				for (var i = 0; i < tseparator.length; i++) {
+					tseparator[i].style.height = heightOrig + 'px';
+				}
+			},
+			QueryInterface: XPCOMUtils.generateQI([Ci.nsINavBookmarkObserver])
+		}
 		bookmarkService.addObserver(bookmarkObserver, false);
 	},
 
-	multirow: function(change) {
+	multirow: function (change) {
 		var PlacesToolbar = document.getElementById('PlacesToolbar');
 		var multirowBar = this.branch.getBoolPref('multirowBar');
 		var heightOrig = 0;
 
 		if (multirowBar && this.PersonalToolbar) {
-			this.styleService('file','multirowBar', true);
+			this.styleService('file', 'multirowBar', true);
 			this.styleService('file', 'multirowBar');
 
 			var fixedHeight = this.branch.getBoolPref('fixedHeight');
@@ -244,43 +303,43 @@
 			var rows = this.branch.getIntPref('rows');
 
 			// When bookmarks bar collapsed- height = 0px. Make it visible in 800 ms.
-			if(this.PersonalToolbar.collapsed) {
+			if (this.PersonalToolbar.collapsed) {
 				roomybookmarkstoolbar.hideBookmarksBar();
-				var timeOut = setTimeout(function() {roomybookmarkstoolbar.hideBookmarksBar();}, 800);
+				var timeOut = setTimeout(function () { roomybookmarkstoolbar.hideBookmarksBar(); }, 800);
 			}
 
 			var bookmarkItem = document.getElementsByClassName("bookmark-item");		//get bookmarks tree and check only 33%(for fast and low load)
 			if (heightFix) {
-				for (var i=0; i<bookmarkItem.length; i=i+3) {
-					var marginTop = +document.defaultView.getComputedStyle(bookmarkItem[i], null).getPropertyValue('margin-top').replace('px','');
-					var marginBottom = +document.defaultView.getComputedStyle(bookmarkItem[i], null).getPropertyValue('margin-bottom').replace('px','');
-					heightOrig = Math.max(heightOrig, bookmarkItem[i].boxObject.height+marginTop+marginBottom);
+				for (var i = 0; i < bookmarkItem.length; i = i + 3) {
+					var marginTop = +document.defaultView.getComputedStyle(bookmarkItem[i], null).getPropertyValue('margin-top').replace('px', '');
+					var marginBottom = +document.defaultView.getComputedStyle(bookmarkItem[i], null).getPropertyValue('margin-bottom').replace('px', '');
+					heightOrig = Math.max(heightOrig, bookmarkItem[i].boxObject.height + marginTop + marginBottom);
 				}
 			} else {
-				for (var i=0; i<bookmarkItem.length; i=i+3) {
+				for (var i = 0; i < bookmarkItem.length; i = i + 3) {
 					heightOrig = Math.max(heightOrig, bookmarkItem[i].boxObject.height);
 				}
 			}
 
 			if (Components.classes['@mozilla.org/xre/app-info;1'].getService(Components.interfaces.nsIXULRuntime).OS == 'Linux') {
 				if (this.branch.getBoolPref('disableLinuxFix') == false) {
-					heightOrig +=6;
-				} 
-			}  else if (Components.classes['@mozilla.org/xre/app-info;1'].getService(Components.interfaces.nsIXULRuntime).OS == 'Darwin') {
-				heightOrig +=3;
+					heightOrig += 6;
+				}
+			} else if (Components.classes['@mozilla.org/xre/app-info;1'].getService(Components.interfaces.nsIXULRuntime).OS == 'Darwin') {
+				heightOrig += 3;
 			} else {
 				if (this.branch.getIntPref('iconSize') >= 18) {
-					heightOrig +=3;
+					heightOrig += 3;
 				} else {
-					heightOrig +=2;
+					heightOrig += 2;
 				}
 			}
 
 
 			if (heightOrig < this.branch.getIntPref('iconSize') && this.PersonalToolbar) {			//If hight not correct - set it = icon size
 				heightOrig = this.branch.getIntPref('iconSize')
-				if(this.branch.getIntPref('height') > this.branch.getIntPref('iconSize')) {		//If height was set and correct(biggest then icon size) set it as height
-					heightOrig =  this.branch.getIntPref('height')
+				if (this.branch.getIntPref('height') > this.branch.getIntPref('iconSize')) {		//If height was set and correct(biggest then icon size) set it as height
+					heightOrig = this.branch.getIntPref('height')
 				}
 			}
 
@@ -289,49 +348,49 @@
 
 			var tseparator = document.getElementsByTagName("toolbarseparator");
 			for (var i = 0; i < tseparator.length; i++) {
-				tseparator[i].style.height = heightOrig+'px';
+				tseparator[i].style.height = heightOrig + 'px';
 			}
 
-			PlacesToolbar.style.maxHeight = height+'px';
-			this.PersonalToolbar.style.maxHeight = height+'px';
+			PlacesToolbar.style.maxHeight = height + 'px';
+			this.PersonalToolbar.style.maxHeight = height + 'px';
 			if (fixedHeight) {
-				PlacesToolbar.style.minHeight = height+'px';
+				PlacesToolbar.style.minHeight = height + 'px';
 			} else {
-				PlacesToolbar.style.minHeight = heightOrig+'px';
+				PlacesToolbar.style.minHeight = heightOrig + 'px';
 			}
 
 			var bookmarksMenu = document.getElementById('ctraddon_bookmarks-menu-toolbar-button');		//Classic theme restore fix
-			if(bookmarksMenu) {	bookmarksMenu.collapsed = true;	}
+			if (bookmarksMenu) { bookmarksMenu.collapsed = true; }
 
 			this.separatorAdded(heightOrig);				//Separator fix(apply css if added new element)
-		
-			window.addEventListener("beforecustomization", function() {roomybookmarkstoolbar.styleService('file','multirowBar', true);}, false);
-			window.addEventListener("aftercustomization", function() {roomybookmarkstoolbar.styleService('file','multirowBar');}, false);
+
+			window.addEventListener("beforecustomization", function () { roomybookmarkstoolbar.styleService('file', 'multirowBar', true); }, false);
+			window.addEventListener("aftercustomization", function () { roomybookmarkstoolbar.styleService('file', 'multirowBar'); }, false);
 		}
-		if(change && !multirowBar) {
-			PlacesToolbar.style.minHeight = heightOrig+'px';
+		if (change && !multirowBar) {
+			PlacesToolbar.style.minHeight = heightOrig + 'px';
 			this.styleService('file', 'multirowBar', true);
 			this.branch.setBoolPref('fixedHeight', false);
-			window.removeEventListener("beforecustomization", function() {roomybookmarkstoolbar.styleService('file','multirowBar', true);}, false);
-			window.removeEventListener("aftercustomization", function() {roomybookmarkstoolbar.styleService('file','multirowBar');}, false);
-		
+			window.removeEventListener("beforecustomization", function () { roomybookmarkstoolbar.styleService('file', 'multirowBar', true); }, false);
+			window.removeEventListener("aftercustomization", function () { roomybookmarkstoolbar.styleService('file', 'multirowBar'); }, false);
+
 		}
 	},
 
-	userStyle: function() {
+	userStyle: function () {
 		var opacity = this.branch.getBoolPref('opacity');
 		var iconSize = this.branch.getIntPref('iconSize');
 		var userWidthEnabled = this.branch.getBoolPref('userWidthEnabled');
 		var folderMargin = this.branch.getIntPref('folderMargin');
 		var textSize = this.branch.getIntPref('textSize');
 
-		if (opacity || iconSize !=16 || userWidthEnabled) {
+		if (opacity || iconSize != 16 || userWidthEnabled) {
 			var opacityTime = this.branch.getIntPref('opacityTime');
 			var opacityTimeLong = this.branch.getIntPref('opacityTimeLong');
 			var userWidth = this.branch.getIntPref('userWidth');
 			if (userWidth < iconSize) { var userWidth = iconSize };		//We not can set 0px as width(bookmarks bar will collapse)
 
-			if(this.cssStr !== 'null') {
+			if (this.cssStr !== 'null') {
 				this.styleService('string', this.cssStr, true)
 			}
 
@@ -340,19 +399,19 @@
 			this.cssStr += '@-moz-document url(chrome://browser/content/browser.xul), url(chrome://navigator/content/navigator.xul) {';
 
 			if (opacity) {
-				this.cssStr += '#PersonalToolbar{opacity:0.4; transition: opacity '+opacityTimeLong+'s linear '+opacityTime+'s !important;}#navigator-toolbox:hover >#PersonalToolbar{opacity:1; transition:opacity !important}';
+				this.cssStr += '#PersonalToolbar{opacity:0.4; transition: opacity ' + opacityTimeLong + 's linear ' + opacityTime + 's !important;}#navigator-toolbox >#PersonalToolbar:hover {opacity:1; transition:opacity !important}';
 			}
-			if (iconSize !=16) {
-				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item .toolbarbutton-icon{width:'+iconSize+'px !important;height:'+iconSize+'px !important}';
+			if (iconSize != 16) {
+				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item .toolbarbutton-icon{width:' + iconSize + 'px !important;height:' + iconSize + 'px !important}';
 			}
 			if (userWidthEnabled) {
-				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item{max-width: '+userWidth+'px !important}';
+				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item{max-width: ' + userWidth + 'px !important}';
 			}
 			if (folderMargin != 0) {
-				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item[type="menu"] .bookmark-item  {padding: 0 0 0 0 !important;margin-bottom: -'+folderMargin+'px !important}';
+				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item[type="menu"] .bookmark-item  {padding: 0 0 0 0 !important;margin-bottom: -' + folderMargin + 'px !important}';
 			}
 			if (textSize != 100) {
-				this.cssStr += '#personal-bookmarks toolbarbutton .toolbarbutton-text {font-size: '+textSize+'% !important}';
+				this.cssStr += '#personal-bookmarks toolbarbutton .toolbarbutton-text {font-size: ' + textSize + '% !important}';
 			}
 			if (Components.classes['@mozilla.org/xre/app-info;1'].getService(Components.interfaces.nsIXULRuntime).OS == 'Darwin') {
 				this.cssStr += '#personal-bookmarks toolbarbutton.bookmark-item .toolbarbutton-icon{max-height:1000px !important;}'
@@ -361,32 +420,32 @@
 
 			this.styleService('string', this.cssStr)
 		} else {
-			if(this.cssStr !== 'null') {
+			if (this.cssStr !== 'null') {
 				this.styleService('string', this.cssStr, true)
 			}
 		}
 	},
 
-	hideByDefault: function() {
-		if(this.branch.getBoolPref('hideByDefault')) {
+	hideByDefault: function () {
+		if (this.branch.getBoolPref('hideByDefault')) {
 			this.PersonalToolbar.collapsed = true;
 		} else {
-			if(!this.branch.getBoolPref('autoHideBar') && !this.branch.getBoolPref('BBonNewTab')) {this.PersonalToolbar.collapsed = false;}
+			if (!this.branch.getBoolPref('autoHideBar') && !this.branch.getBoolPref('BBonNewTab')) { this.PersonalToolbar.collapsed = false; }
 		}
 	},
 
-	BBonNewTab: function() {
+	BBonNewTab: function () {
 		var tabContainer = gBrowser.tabContainer;
 		var windowsService = Components.classes['@mozilla.org/appshell/window-mediator;1']
-									   .getService(Components.interfaces.nsIWindowMediator);
+			.getService(Components.interfaces.nsIWindowMediator);
 
 		function hideBBonPage() {
-			if(roomybookmarkstoolbar.branch.getBoolPref('BBonNewTab')) {
+			if (roomybookmarkstoolbar.branch.getBoolPref('BBonNewTab')) {
 				var tabUrl = windowsService.getMostRecentWindow('navigator:browser').getBrowser().currentURI.spec;
 
 				var blankPage = 'about:blank'; //For pass addon validator
 				var newTab = 'about:newtab';
-				if(tabUrl == blankPage || tabUrl == newTab) {
+				if (tabUrl == blankPage || tabUrl == newTab) {
 					roomybookmarkstoolbar.PersonalToolbar.collapsed = false;
 				} else {
 					roomybookmarkstoolbar.PersonalToolbar.collapsed = true;
@@ -394,7 +453,7 @@
 			}
 		}
 
-		if(this.branch.getBoolPref('BBonNewTab')) {
+		if (this.branch.getBoolPref('BBonNewTab')) {
 			tabContainer.removeEventListener("TabSelect", hideBBonPage, false);
 			tabContainer.addEventListener("TabSelect", hideBBonPage, false);
 			tabContainer.removeEventListener("TabAttrModified", hideBBonPage, false);
@@ -402,17 +461,17 @@
 		} else {
 			tabContainer.removeEventListener("TabSelect", hideBBonPage, false);
 			tabContainer.removeEventListener("TabAttrModified", hideBBonPage, false);
-			if(!this.branch.getBoolPref('autoHideBar') && !this.branch.getBoolPref('hideByDefault')) {this.PersonalToolbar.collapsed = false;}
+			if (!this.branch.getBoolPref('autoHideBar') && !this.branch.getBoolPref('hideByDefault')) { this.PersonalToolbar.collapsed = false; }
 		}
 	},
 
-	hideBookmarksBar: function() {
+	hideBookmarksBar: function () {
 		this.PersonalToolbar.collapsed = !this.PersonalToolbar.collapsed;
 	},
 
-	optionsHandler: function() {
+	optionsHandler: function () {
 		if (this.PersonalToolbar) {
-			if(this.branch.getBoolPref('hideBookmarksName')) {this.branch.setBoolPref('showBookmarksNames', false)}		//We change old options to new
+			if (this.branch.getBoolPref('hideBookmarksName')) { this.branch.setBoolPref('showBookmarksNames', false) }		//We change old options to new
 			roomybookmarkstoolbar.userStyle();
 			roomybookmarkstoolbar.unRegisterCss();
 			roomybookmarkstoolbar.registerCss();
@@ -423,7 +482,7 @@
 		}
 	},
 
-	unRegisterCss: function() {
+	unRegisterCss: function () {
 		this.styleService('file', 'base', true);
 		this.styleService('file', 'main', true);
 		this.styleService('file', 'linux', true);
@@ -447,7 +506,7 @@
 		this.styleService('file', 'location-2', true);
 	},
 
-	registerCss: function() {
+	registerCss: function () {
 		var hideFoldersNames = this.branch.getBoolPref('hideFoldersNames');
 		var hideNoFaviconNames = this.branch.getBoolPref('hideNoFaviconNames');
 		var hideFolderIcons = this.branch.getBoolPref('hideFolderIcons');
@@ -457,27 +516,27 @@
 		var disableLinuxFix = this.branch.getBoolPref('disableLinuxFix');
 		var location = this.branch.getIntPref('location');
 
- 		//If was enabled showBookmarksNames - need disable hiding
-		if(this.branch.getBoolPref('showBookmarksNames')) {
+		//If was enabled showBookmarksNames - need disable hiding
+		if (this.branch.getBoolPref('showBookmarksNames')) {
 			this.branch.setBoolPref('hideBookmarksName', false);
 		}
 
 		this.styleService('file', 'main');
 
-		if (hideFoldersNames) { this.styleService('file', 'hideFoldersNames');}
-		if (hideNoFaviconNames) {this.styleService('file', 'hideNoFaviconNames');}
-		if (hideFolderIcons && !hideFoldersNames) {this.styleService('file', 'hideFolderIcons');}
-		if (hideDefaultIcons && !hideNoFaviconNames) {this.styleService('file', 'hideNoFavicon'); }
-		if (hideBookmarksName) {this.styleService('file', 'base');}
-		if (hideBookmarksIcons && !hideBookmarksName) {this.styleService('file', 'hideBookmarksIcons');}
+		if (hideFoldersNames) { this.styleService('file', 'hideFoldersNames'); }
+		if (hideNoFaviconNames) { this.styleService('file', 'hideNoFaviconNames'); }
+		if (hideFolderIcons && !hideFoldersNames) { this.styleService('file', 'hideFolderIcons'); }
+		if (hideDefaultIcons && !hideNoFaviconNames) { this.styleService('file', 'hideNoFavicon'); }
+		if (hideBookmarksName) { this.styleService('file', 'base'); }
+		if (hideBookmarksIcons && !hideBookmarksName) { this.styleService('file', 'hideBookmarksIcons'); }
 
-		if (this.branch.getBoolPref('mousehover')) {this.styleService('file', 'mousehover');}
-		if (this.branch.getBoolPref('bookmarksAboveTab')) {this.styleService('file', 'top');}
-		if (this.branch.getBoolPref('overPage')) {this.styleService('file', 'overPage'); }
-		if (this.branch.getBoolPref('folderArrow')) {this.styleService('file', 'folderArrow'); }
+		if (this.branch.getBoolPref('mousehover')) { this.styleService('file', 'mousehover'); }
+		if (this.branch.getBoolPref('bookmarksAboveTab')) { this.styleService('file', 'top'); }
+		if (this.branch.getBoolPref('overPage')) { this.styleService('file', 'overPage'); }
+		if (this.branch.getBoolPref('folderArrow')) { this.styleService('file', 'folderArrow'); }
 
-		this.styleService('file', 'spacing-'+this.branch.getIntPref('spacing'));
-		if(location != 0) {this.styleService('file', 'location-'+location);}
+		this.styleService('file', 'spacing-' + this.branch.getIntPref('spacing'));
+		if (location != 0) { this.styleService('file', 'location-' + location); }
 
 		//fix style in linux
 		if (Components.classes['@mozilla.org/xre/app-info;1'].getService(Components.interfaces.nsIXULRuntime).OS == 'Linux' && disableLinuxFix == false) {
@@ -485,7 +544,7 @@
 		}
 	},
 
-	startUpMainCheck: function() {
+	startUpMainCheck: function () {
 		var PersonalToolbar = document.getElementById('PersonalToolbar');
 		var bookmarkItem = document.getElementsByClassName("bookmark-item");
 		if (PersonalToolbar && bookmarkItem.length >= 0 && this.loaded != true) {
@@ -496,7 +555,7 @@
 				this.multirow();
 			}
 			if (this.branch.getBoolPref('autoHideBar')) {
-				if(this.PersonalToolbar.collapsed){
+				if (this.PersonalToolbar.collapsed) {
 					this.branch.setBoolPref('bookmarksBarHided', true)
 					popup("Roomy Bookmarks Toolbar", "Enable bookmarks bar in context menu(right-click on some browser element(like menu or menu button)) and restart browser")
 				} else {
@@ -504,7 +563,7 @@
 					this.branch.setBoolPref('bookmarksBarHided', false)
 				}
 			} else {
-				if(this.PersonalToolbar.collapsed){
+				if (this.PersonalToolbar.collapsed) {
 					this.branch.setBoolPref('bookmarksBarHided', true)
 				} else {
 					this.branch.setBoolPref('bookmarksBarHided', false)
@@ -516,25 +575,25 @@
 			if (this.branch.getBoolPref('BBonNewTab')) {
 				this.BBonNewTab();
 			}
-			var timeOut = setTimeout(function() {roomybookmarkstoolbar.setColor();}, 3000);
+			var timeOut = setTimeout(function () { roomybookmarkstoolbar.setColor(); }, 3000);
 
 			//After customisation colors are wiped
-			window.addEventListener("aftercustomization", function() {setTimeout(function() {roomybookmarkstoolbar.setColor();}, 1000)}, false);
+			window.addEventListener("aftercustomization", function () { setTimeout(function () { roomybookmarkstoolbar.setColor(); }, 1000) }, false);
 		}
 		function popup(title, msg) {
-		  var image = null;
-		  var win = Components.classes['@mozilla.org/embedcomp/window-watcher;1']
-							  .getService(Components.interfaces.nsIWindowWatcher)
-							  .openWindow(null, 'chrome://global/content/alerts/alert.xul',
-										  '_blank', 'chrome,titlebar=no,popup=yes', null);
-		  win.arguments = [image, title, msg, false, ''];
+			var image = null;
+			var win = Components.classes['@mozilla.org/embedcomp/window-watcher;1']
+				.getService(Components.interfaces.nsIWindowWatcher)
+				.openWindow(null, 'chrome://global/content/alerts/alert.xul',
+					'_blank', 'chrome,titlebar=no,popup=yes', null);
+			win.arguments = [image, title, msg, false, ''];
 		}
 	},
 
-	setColor: function(data, DBevent, callback) {
+	setColor: function (data, DBevent, callback) {
 		var bookmarkItem = document.getElementsByClassName("bookmark-item");
 		//Set content menu id listener
-		for (var i=0; i<bookmarkItem.length; i++) {
+		for (var i = 0; i < bookmarkItem.length; i++) {
 			bookmarkItem[i].addEventListener("contextmenu", function (event) {
 				roomybookmarkstoolbar.id = PlacesUtils.getConcreteItemId(event.target._placesNode);
 			}, false);
@@ -546,15 +605,15 @@
 				this.styleService('string', this.colorCSS, true);
 			}
 			let file = FileUtils.getFile("ProfD", ["roomybookmarkstoolbar.sqlite"]);
-			try {file.remove(false);} catch(e) {} 
+			try { file.remove(false); } catch (e) { }
 			return;
 		}
 
 		Components.utils.import("resource://gre/modules/Services.jsm");
 		Components.utils.import("resource://gre/modules/FileUtils.jsm");
-		this.colorCSS = '@namespace url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul);'+'\n'+'\n';
-		this.colorCSS += '@-moz-document url(chrome://browser/content/browser.xul), url(chrome://navigator/content/navigator.xul) {'+'\n';
-		var firstBookmarksId=0;
+		this.colorCSS = '@namespace url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul);' + '\n' + '\n';
+		this.colorCSS += '@-moz-document url(chrome://browser/content/browser.xul), url(chrome://navigator/content/navigator.xul) {' + '\n';
+		var firstBookmarksId = 0;
 		var macOS = false;
 
 		if (Components.classes['@mozilla.org/xre/app-info;1'].getService(Components.interfaces.nsIXULRuntime).OS == 'Darwin') {
@@ -568,41 +627,41 @@
 		try {
 			var statement = dbConn.createStatement("SELECT * FROM colors");
 			statement.executeAsync({
-					handleResult: function(aResultSet) {
-							for (var row = aResultSet.getNextRow(); row; row = aResultSet.getNextRow()) {
-								setColor(row.getResultByName("id"), row.getResultByName("textcolor"), row.getResultByName("backgroundcolor"));
-							}
-					},
-					handleCompletion: function(aResultSet) {
-						if (macOS) {
-							roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item:hover > .toolbarbutton-text {color: #000000;}'
-							roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item:hover {background-color:transparent !important;}#personal-bookmarks toolbarbutton.bookmark-item > .toolbarbutton-text {text-shadow: none !important;}';
-						}
-						roomybookmarkstoolbar.colorCSS += '}'
-						roomybookmarkstoolbar.styleService('string', roomybookmarkstoolbar.colorCSS);
-						dbConn.asyncClose()
+				handleResult: function (aResultSet) {
+					for (var row = aResultSet.getNextRow(); row; row = aResultSet.getNextRow()) {
+						setColor(row.getResultByName("id"), row.getResultByName("textcolor"), row.getResultByName("backgroundcolor"));
 					}
+				},
+				handleCompletion: function (aResultSet) {
+					if (macOS) {
+						roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item:hover > .toolbarbutton-text {color: #000000;}'
+						roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item:hover {background-color:transparent !important;}#personal-bookmarks toolbarbutton.bookmark-item > .toolbarbutton-text {text-shadow: none !important;}';
+					}
+					roomybookmarkstoolbar.colorCSS += '}'
+					roomybookmarkstoolbar.styleService('string', roomybookmarkstoolbar.colorCSS);
+					dbConn.asyncClose()
+				}
 			});
 		} finally {
 		}
-			
+
 		function getBookmrksBarId() {				//Get id for root bookmarks folder. Different in systems\ versions
-			if(bookmarkItem[firstBookmarksId]) {
+			if (bookmarkItem[firstBookmarksId]) {
 				var target = bookmarkItem[firstBookmarksId];
-	
-				while(target) {
-					if(target.id == 'PersonalToolbar') {
+
+				while (target) {
+					if (target.id == 'PersonalToolbar') {
 						return firstBookmarksId;
 					}
 					target = target.parentNode;
 					if (!target) {
-						firstBookmarksId=firstBookmarksId+1;
+						firstBookmarksId = firstBookmarksId + 1;
 						target = bookmarkItem[firstBookmarksId]
 					}
 				}
 			}
 		}
-		
+
 		function setColor(id, texColor, bacColor) {
 			var bookmarksid = PlacesUtils.bookmarks.getItemIndex(id);
 			getBookmrksBarId();
@@ -610,41 +669,41 @@
 			if (bookmarkItem[firstBookmarksId].parentNode.children[bookmarksid]) {
 				bookmarkItem[firstBookmarksId].parentNode.children[bookmarksid].style.color = texColor; 	//Set text color
 				bookmarkItem[firstBookmarksId].parentNode.children[bookmarksid].setAttribute('rbtid', id);	//Set id(for css selection)
-				if (bacColor == '') {bacColor = 'transparent';}
+				if (bacColor == '') { bacColor = 'transparent'; }
 				if (macOS) {		//Mac need gray background fix
-					roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item[rbtid="'+id+'"] > .toolbarbutton-text {background-color:'+bacColor+'; border-radius: 6px;}#personal-bookmarks toolbarbutton.bookmark-item:hover[rbtid="'+id+'"] > .toolbarbutton-text {color: '+texColor+';}';
+					roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item[rbtid="' + id + '"] > .toolbarbutton-text {background-color:' + bacColor + '; border-radius: 6px;}#personal-bookmarks toolbarbutton.bookmark-item:hover[rbtid="' + id + '"] > .toolbarbutton-text {color: ' + texColor + ';}';
 				} else {
-					roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item[rbtid="'+id+'"] > .toolbarbutton-text {background-color:'+bacColor+'; border-radius: 6px;}';
+					roomybookmarkstoolbar.colorCSS += '#personal-bookmarks toolbarbutton.bookmark-item[rbtid="' + id + '"] > .toolbarbutton-text {background-color:' + bacColor + '; border-radius: 6px;}';
 				}
 			}
 		}
 	},
 
-	openColorMenu: function() {
+	openColorMenu: function () {
 		var elementURL;
 		if (PlacesUtils.bookmarks.getItemType(roomybookmarkstoolbar.id) == 1) { //If bookmarks
 			var URIObject = PlacesUtils.bookmarks.getBookmarkURI(roomybookmarkstoolbar.id);
-			elementURL = URIObject.scheme+'://'+URIObject.host+URIObject.path;
+			elementURL = URIObject.scheme + '://' + URIObject.host + URIObject.path;
 		}
 		if (PlacesUtils.bookmarks.getItemType(roomybookmarkstoolbar.id) == 2) {	//If folder
-				elementURL = 'Folder'
+			elementURL = 'Folder'
 		}
-		var bookmarkData = {inn:{id:roomybookmarkstoolbar.id, url:elementURL, title:PlacesUtils.bookmarks.getItemTitle(roomybookmarkstoolbar.id)}, out:null};
-		openDialog("chrome://roomybookmarkstoolbar/content/colorMenu.xul","dlg","chrome, dialog, modal, centerscreen",bookmarkData).focus();
+		var bookmarkData = { inn: { id: roomybookmarkstoolbar.id, url: elementURL, title: PlacesUtils.bookmarks.getItemTitle(roomybookmarkstoolbar.id) }, out: null };
+		openDialog("chrome://roomybookmarkstoolbar/content/colorMenu.xul", "dlg", "chrome, dialog, modal, centerscreen", bookmarkData).focus();
 		this.setColor();	//After dialog close - set colors
 	},
 }
 
-window.addEventListener("load", function load(){
-    window.removeEventListener("load", load, false);
+window.addEventListener("load", function load() {
+	window.removeEventListener("load", load, false);
 	roomybookmarkstoolbar.register();
 	roomybookmarkstoolbar.registerCss();
-	var timeOut = setTimeout(function() {roomybookmarkstoolbar.startUpMainCheck();}, 3000);
+	var timeOut = setTimeout(function () { roomybookmarkstoolbar.startUpMainCheck(); }, 3000);
 
 	window.addEventListener('DOMContentLoaded', function () {		//Load event so fast for linux/old version. Css can't apply
 		window.removeEventListener("DOMContentLoaded", load, false);
 		roomybookmarkstoolbar.startUpMainCheck();
 	}, false);
-},false);
+}, false);
 
-window.addEventListener("unload", function(event){roomybookmarkstoolbar.unregister();}, false);
+window.addEventListener("unload", function (event) { roomybookmarkstoolbar.unregister(); }, false);
